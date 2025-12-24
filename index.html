@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aventura do Bob - Especial de Natal</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
+        #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 10;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        #interaction-msg {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ffff00;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px black;
+            background: rgba(0,0,0,0.6);
+            padding: 15px 30px;
+            border-radius: 30px;
+            display: none;
+            pointer-events: none;
+            z-index: 15;
+            border: 2px solid white;
+            text-align: center;
+        }
+
+        #victory-container {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7); /* Fundo escuro para destacar */
+            z-index: 20;
+            display: flex; /* Flexbox para centralizar */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0; /* Começa invisível para fade in */
+            transition: opacity 1s;
+            pointer-events: none; /* Não bloqueia cliques quando invisível */
+        }
+
+        /* Classe para mostrar o container */
+        #victory-container.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #victory-message {
+            color: #FFD700;
+            font-size: 80px; /* Bem grande */
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            margin-bottom: 10px;
+            animation: pulse 1s infinite alternate;
+            margin-top: -50px; /* Subir um pouco */
+        }
+        
+        #victory-sub {
+            color: white; 
+            font-size: 30px; 
+            margin-bottom: 60px;
+            text-shadow: 1px 1px 3px black;
+        }
+
+        #restart-btn {
+            padding: 20px 40px;
+            font-size: 28px;
+            background-color: #d42424; /* Vermelho Natal */
+            color: white;
+            border: 3px solid white;
+            border-radius: 50px;
+            cursor: pointer;
+            font-family: inherit;
+            box-shadow: 0 6px 10px rgba(0,0,0,0.5);
+            transition: transform 0.1s, background-color 0.2s;
+            pointer-events: auto;
+        }
+
+        #restart-btn:hover {
+            transform: scale(1.1);
+            background-color: #ff4444;
+        }
+        
+        @keyframes pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.05); }
+        }
+
+        #loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #87CEEB; /* Céu Azul */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 30;
+            transition: opacity 0.5s;
+        }
+
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #d42424;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+            text-align: center;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px 25px;
+            border-radius: 20px;
+            line-height: 1.5;
+        }
+        
+        #click-to-start {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 15;
+            text-align: center;
+            display: none;
+        }
+    </style>
+    <!-- Import Map para Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <h2 id="loading-text">Preparando o Natal...</h2>
+    </div>
+
+    <div id="click-to-start">
+        <h2>NATAL DO INTELIGÊNCIA MIL GRAU</h2>
+        <p>(Controles: Mouse + WASD)</p>
+    </div>
+
+    <div id="ui-layer">
+        🎅 Bolsa: <span id="inventory">0</span> Presentes<br>
+        🎄 Entregues: <span id="delivered">0</span> / 5
+    </div>
+
+    <div id="interaction-msg"></div>
+
+    <div id="victory-container">
+        <div id="victory-message">FELIZ NATAL!</div>
+        <div id="victory-sub">Todas as crianças receberam presentes!</div>
+        <button id="restart-btn">Entregar Mais</button>
+    </div>
+
+    <div id="controls-hint">
+        <b>Mouse</b>: Olha / Soco | <b>WASD</b>: Move<br>
+        <b>Shift</b>: Andar | <b>F</b>: Dirigir Veículo | <b>E</b>: Entregar/Soco<br>
+        <b>Espaço</b>: Pular | <b>ESC</b>: Soltar mouse
+    </div>
+
+    <div id="game-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // --- Variáveis Globais ---
+        let scene, camera, renderer;
+        let character, mixer;
+        let clock = new THREE.Clock();
+        
+        // Gameplay Natal
+        let presents = []; 
+        let fireplaces = []; 
+        let deliveredGiftsObjects = []; 
+        let inventory = 0;
+        let deliveredCount = 0;
+        const totalDeliveriesNeeded = 5; 
+        
+        // UI
+        let messageTimer = null; // Variável para controlar o tempo da mensagem
+        
+        let obstacles = []; 
+        let wallColliders = []; 
+        let kids = []; 
+        
+        // Veículos
+        let car;
+        let train;
+        let currentVehicle = null; 
+        let vehicleSpeed = 0;
+        const carMaxSpeed = 25;
+        const trainMaxSpeed = 15; 
+        const vehicleAccel = 15;
+        const vehicleFriction = 10;
+        
+        // Pet
+        let pet;
+        let petActive = false;
+        let petSpeed = 5.5;
+        
+        // Fumaça
+        let smokeParticles = [];
+        let chimneyEmitters = [];
+        let trainEmitter = null;
+
+        // Controles
+        const keys = { w: false, a: false, s: false, d: false, space: false, shift: false };
+        
+        // Câmera
+        let cameraDistance = 8;
+        let cameraRotationX = 0; 
+        let cameraRotationY = 0.3; 
+        const minDistance = 2; 
+        const maxDistance = 25;
+        
+        // Física
+        let velocityY = 0;
+        const gravity = -30;
+        const jumpForce = 12;
+        let isJumping = false;
+        
+        // Velocidades
+        const walkSpeed = 4;
+        const runSpeed = 10;
+        let rotationSpeed = 10;
+        let groundOffset = 0; 
+        
+        // Animações
+        let actions = {};
+        let activeAction; 
+        let allAnimations = [];
+        
+        let isAttacking = false;
+        let isVictory = false;
+
+        const MODEL_URL = 'https://raw.githubusercontent.com/inteligenciamilgrau/personagens/main/bob.glb';
+
+        init();
+        animate();
+
+        function init() {
+            // Cena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB); 
+            scene.fog = new THREE.Fog(0x87CEEB, 10, 80);
+
+            // Câmera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('game-container').appendChild(renderer.domElement);
+
+            // Luzes
+            const ambiLight = new THREE.AmbientLight(0x606060, 1.2); 
+            scene.add(ambiLight);
+
+            const sunLight = new THREE.DirectionalLight(0xffffff, 1.2); 
+            sunLight.position.set(50, 100, 50);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            scene.add(sunLight);
+
+            // --- AMBIENTE ---
+            createSky();
+
+            // Chão
+            const mesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(150, 150),
+                new THREE.MeshPhongMaterial({ color: 0x2d5a27, depthWrite: true }) 
+            );
+            mesh.rotation.x = - Math.PI / 2;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+
+            // Assets
+            loadCharacter();
+            createCity();
+            createCar();
+            createTrain();
+
+            // Spawnar Presentes
+            for(let i=0; i<15; i++) spawnPresent(); 
+            
+            setTimeout(spawnPet, 1000);
+
+            // Events
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('click', onClick);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('wheel', onMouseWheel, { passive: false });
+            document.addEventListener('pointerlockchange', onPointerLockChange);
+            document.addEventListener('mousedown', onMouseDown);
+            document.getElementById('restart-btn').addEventListener('click', restartGame);
+        }
+
+        function createSky() {
+            const sunGeo = new THREE.SphereGeometry(5, 32, 32);
+            const sunMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+            const sun = new THREE.Mesh(sunGeo, sunMat);
+            sun.position.set(50, 80, 50);
+            scene.add(sun);
+
+            const cloudGeo = new THREE.BoxGeometry(1, 1, 1);
+            const cloudMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.8 });
+            
+            for(let i=0; i<10; i++) {
+                const cloud = new THREE.Group();
+                const parts = 3 + Math.floor(Math.random() * 3);
+                for(let j=0; j<parts; j++) {
+                    const mesh = new THREE.Mesh(cloudGeo, cloudMat);
+                    mesh.position.set(Math.random()*4, Math.random()*1, Math.random()*2);
+                    mesh.scale.set(4 + Math.random()*2, 2 + Math.random(), 3 + Math.random());
+                    cloud.add(mesh);
+                }
+                cloud.position.set((Math.random()-0.5)*100, 30 + Math.random()*20, (Math.random()-0.5)*100);
+                scene.add(cloud);
+            }
+        }
+
+        // --- VEÍCULOS ---
+        function createCar() {
+            const carGroup = new THREE.Group();
+            
+            const chassis = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 4), new THREE.MeshStandardMaterial({ color: 0xcc3333 }));
+            chassis.position.y = 0.5;
+            chassis.castShadow = true;
+            carGroup.add(chassis);
+            
+            const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.8, 2), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+            cabin.position.set(0, 1.0, -0.5);
+            carGroup.add(cabin);
+            
+            const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+            wheelGeo.rotateZ(Math.PI / 2);
+            [[-1.1, 0.4, 1.2], [1.1, 0.4, 1.2], [-1.1, 0.4, -1.2], [1.1, 0.4, -1.2]].forEach(pos => {
+                const w = new THREE.Mesh(wheelGeo, wheelMat);
+                w.position.set(...pos);
+                carGroup.add(w);
+            });
+
+            const ribbon = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.1, 0.5), new THREE.MeshStandardMaterial({ color: 0x00ff00 }));
+            ribbon.position.set(0, 0.8, 1);
+            carGroup.add(ribbon);
+
+            carGroup.position.set(8, 0, 8);
+            carGroup.rotation.y = -Math.PI / 4;
+            scene.add(carGroup);
+            car = carGroup;
+        }
+
+        function createTrain() {
+            const trainGroup = new THREE.Group();
+
+            // Caldeira
+            const boilerGeo = new THREE.CylinderGeometry(0.8, 0.8, 3.5, 16);
+            const boilerMat = new THREE.MeshStandardMaterial({ color: 0x111111 }); // Preto
+            const boiler = new THREE.Mesh(boilerGeo, boilerMat);
+            boiler.rotation.x = -Math.PI / 2;
+            boiler.position.y = 1.0;
+            boiler.castShadow = true;
+            trainGroup.add(boiler);
+
+            // Cabine
+            const cabGeo = new THREE.BoxGeometry(2, 2.5, 1.5);
+            const cabMat = new THREE.MeshStandardMaterial({ color: 0xcc0000 }); // Vermelho
+            const cab = new THREE.Mesh(cabGeo, cabMat);
+            cab.position.set(0, 1.5, -1.5);
+            cab.castShadow = true;
+            trainGroup.add(cab);
+
+            // Teto Cabine
+            const roofGeo = new THREE.BoxGeometry(2.2, 0.2, 2.0);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0xddaa00 }); // Dourado
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.position.set(0, 2.8, -1.5);
+            trainGroup.add(roof);
+
+            // Chaminé
+            const stackGeo = new THREE.CylinderGeometry(0.3, 0.2, 1.0);
+            const stack = new THREE.Mesh(stackGeo, new THREE.MeshStandardMaterial({color: 0x333333}));
+            stack.position.set(0, 1.8, 1.0);
+            trainGroup.add(stack);
+
+            // Emitter do Trem
+            trainEmitter = new THREE.Object3D();
+            trainEmitter.position.set(0, 2.4, 1.0);
+            trainGroup.add(trainEmitter);
+
+            // Limpa-trilhos (Cowcatcher)
+            const catchGeo = new THREE.ConeGeometry(1, 1, 4);
+            const catchMat = new THREE.MeshStandardMaterial({color: 0x555555});
+            const catcher = new THREE.Mesh(catchGeo, catchMat);
+            catcher.rotation.x = -Math.PI/2;
+            catcher.rotation.z = Math.PI/4;
+            catcher.position.set(0, 0.5, 2.0);
+            trainGroup.add(catcher);
+
+            // Rodas (Grandes e Pequenas)
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0xddaa00 }); // Dourado
+            const bigWheelGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.2, 16);
+            bigWheelGeo.rotateZ(Math.PI/2);
+            
+            // Rodas Traseiras (Grandes)
+            [[-1.1, 0.6, -1.5], [1.1, 0.6, -1.5]].forEach(pos => {
+                const w = new THREE.Mesh(bigWheelGeo, wheelMat);
+                w.position.set(...pos);
+                trainGroup.add(w);
+            });
+
+            // Rodas Dianteiras (Pequenas)
+            const smallWheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.2, 16);
+            smallWheelGeo.rotateZ(Math.PI/2);
+            [[-1.0, 0.4, 0.5], [1.0, 0.4, 0.5], [-1.0, 0.4, 1.5], [1.0, 0.4, 1.5]].forEach(pos => {
+                const w = new THREE.Mesh(smallWheelGeo, wheelMat);
+                w.position.set(...pos);
+                trainGroup.add(w);
+            });
+
+            // Posicionar no mapa
+            trainGroup.position.set(-8, 0, -8);
+            trainGroup.rotation.y = Math.PI / 4;
+            scene.add(trainGroup);
+            train = trainGroup;
+        }
+
+        // --- CIDADE & CASAS ---
+        function createCity() {
+            const cityGroup = new THREE.Group();
+            scene.add(cityGroup);
+            obstacles = []; 
+            wallColliders = [];
+            fireplaces = [];
+            chimneyEmitters = [];
+            kids = [];
+
+            const roadMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+            const stripeMat = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
+
+            // Ruas
+            const road1 = new THREE.Mesh(new THREE.PlaneGeometry(12, 120), roadMat);
+            road1.rotation.x = -Math.PI / 2;
+            road1.position.y = 0.02;
+            road1.receiveShadow = true;
+            cityGroup.add(road1);
+
+            for (let z = -55; z < 55; z += 6) {
+                const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 3), stripeMat);
+                stripe.rotation.x = -Math.PI / 2;
+                stripe.position.set(0, 0.03, z);
+                cityGroup.add(stripe);
+            }
+
+            const road2 = new THREE.Mesh(new THREE.PlaneGeometry(120, 12), roadMat);
+            road2.rotation.x = -Math.PI / 2;
+            road2.position.y = 0.021;
+            road2.receiveShadow = true;
+            cityGroup.add(road2);
+
+            for (let x = -55; x < 55; x += 6) {
+                const stripe = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.3), stripeMat);
+                stripe.rotation.x = -Math.PI / 2;
+                stripe.position.set(x, 0.031, 0);
+                cityGroup.add(stripe);
+            }
+
+            // Casas
+            const createHouse = (x, z, rotY, color) => {
+                const houseGroup = new THREE.Group();
+                houseGroup.position.set(x, 0, z);
+                houseGroup.rotation.y = rotY;
+
+                const width = 8, depth = 8, height = 5, wallThick = 0.3;
+                const wallMat = new THREE.MeshStandardMaterial({ color: color, side: THREE.DoubleSide });
+                const floorMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21 });
+                
+                const floor = new THREE.Mesh(new THREE.BoxGeometry(width, 0.1, depth), floorMat);
+                floor.position.y = 0.05;
+                houseGroup.add(floor);
+
+                const walls = [];
+                const backWall = new THREE.Mesh(new THREE.BoxGeometry(width, height, wallThick), wallMat);
+                backWall.position.set(0, height/2, -depth/2 + wallThick/2);
+                backWall.castShadow = true;
+                houseGroup.add(backWall);
+                walls.push(backWall);
+                
+                const leftWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, height, depth), wallMat);
+                leftWall.position.set(-width/2 + wallThick/2, height/2, 0);
+                leftWall.castShadow = true;
+                houseGroup.add(leftWall);
+                walls.push(leftWall);
+
+                const rightWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, height, depth), wallMat);
+                rightWall.position.set(width/2 - wallThick/2, height/2, 0);
+                rightWall.castShadow = true;
+                houseGroup.add(rightWall);
+                walls.push(rightWall);
+
+                const frontWallWidth = (width - 2.5) / 2;
+                const frontLeft = new THREE.Mesh(new THREE.BoxGeometry(frontWallWidth, height, wallThick), wallMat);
+                frontLeft.position.set(-(width/2) + frontWallWidth/2, height/2, depth/2 - wallThick/2);
+                frontLeft.castShadow = true;
+                houseGroup.add(frontLeft);
+                walls.push(frontLeft);
+
+                const frontRight = new THREE.Mesh(new THREE.BoxGeometry(frontWallWidth, height, wallThick), wallMat);
+                frontRight.position.set((width/2) - frontWallWidth/2, height/2, depth/2 - wallThick/2);
+                frontRight.castShadow = true;
+                houseGroup.add(frontRight);
+                walls.push(frontRight);
+
+                const roofHeight = 3;
+                const roofGeo = new THREE.ConeGeometry(width * 0.8, roofHeight, 4);
+                const roofMat = new THREE.MeshStandardMaterial({ color: 0x331111 });
+                const roof = new THREE.Mesh(roofGeo, roofMat);
+                roof.position.y = height + roofHeight / 2;
+                roof.rotation.y = Math.PI / 4; 
+                houseGroup.add(roof);
+
+                const chimney = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0x555555}));
+                chimney.position.set(2, height + 1.5, -2);
+                houseGroup.add(chimney);
+
+                const emitter = new THREE.Object3D();
+                emitter.position.set(2, height + 3, -2);
+                houseGroup.add(emitter);
+
+                const firePlaceGroup = new THREE.Group();
+                firePlaceGroup.position.set(0, 0, -depth/2 + 0.8); 
+                const fpBase = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1), new THREE.MeshStandardMaterial({color: 0x444444}));
+                fpBase.position.y = 1;
+                firePlaceGroup.add(fpBase);
+                const fireLight = new THREE.PointLight(0xff6600, 1, 8);
+                fireLight.position.set(0, 1, 0.6);
+                firePlaceGroup.add(fireLight);
+                houseGroup.add(firePlaceGroup);
+
+                const kid = createKid();
+                kid.position.set(2, 0.5, -depth/2 + 2); 
+                kid.rotation.y = Math.PI;
+                houseGroup.add(kid);
+                kids.push(kid);
+
+                const trigger = new THREE.Object3D();
+                trigger.position.copy(firePlaceGroup.position);
+                trigger.position.z += 1.5; 
+                trigger.userData = { type: 'fireplace', houseId: Math.random(), linkedKid: kid, hasGift: false, linkedEmitter: emitter };
+                houseGroup.add(trigger);
+                fireplaces.push(trigger);
+
+                const zoneGeo = new THREE.RingGeometry(0.5, 0.7, 16);
+                const zoneMat = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide });
+                const zone = new THREE.Mesh(zoneGeo, zoneMat);
+                zone.rotation.x = -Math.PI/2;
+                zone.position.y = 0.1;
+                trigger.add(zone);
+
+                const carCollider = new THREE.Box3().setFromCenterAndSize(
+                    new THREE.Vector3(x, height/2, z), 
+                    new THREE.Vector3(width, height, depth)
+                );
+                obstacles.push(carCollider);
+                
+                cityGroup.add(houseGroup);
+
+                houseGroup.updateMatrixWorld(true);
+                walls.forEach(w => {
+                    const box = new THREE.Box3().setFromObject(w);
+                    wallColliders.push(box);
+                });
+            };
+
+            createHouse(20, 20, -Math.PI/2, 0xcc5555); 
+            createHouse(-20, 20, Math.PI/2, 0x4488cc); 
+            createHouse(-20, -20, Math.PI/2, 0xffcc00);
+            createHouse(20, -20, -Math.PI/2, 0x55cc55);
+            createHouse(0, 35, Math.PI, 0x9966cc); 
+        }
+
+        function createKid() {
+            const kidGroup = new THREE.Group();
+            kidGroup.userData = { isHappy: false, baseY: 0.75 };
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.3), new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff }));
+            body.position.y = 0.75; kidGroup.add(body);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.35), new THREE.MeshStandardMaterial({ color: 0xffccaa }));
+            head.position.y = 1.35; kidGroup.add(head);
+            const eyeGeo = new THREE.SphereGeometry(0.05); const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.15, 1.4, 0.3); kidGroup.add(eyeL);
+            const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.15, 1.4, 0.3); kidGroup.add(eyeR);
+            const limbGeo = new THREE.BoxGeometry(0.15, 0.6, 0.15); const limbMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+            const armL = new THREE.Mesh(limbGeo, limbMat); armL.position.set(-0.35, 0.9, 0); kidGroup.add(armL); kidGroup.userData.armL = armL;
+            const armR = new THREE.Mesh(limbGeo, limbMat); armR.position.set(0.35, 0.9, 0); kidGroup.add(armR); kidGroup.userData.armR = armR;
+            const legL = new THREE.Mesh(limbGeo, limbMat); legL.position.set(-0.15, 0.3, 0); kidGroup.add(legL);
+            const legR = new THREE.Mesh(limbGeo, limbMat); legR.position.set(0.15, 0.3, 0); kidGroup.add(legR);
+            return kidGroup;
+        }
+
+        // --- SISTEMA DE PRESENTES ---
+        function spawnPresent() {
+            const group = new THREE.Group();
+            const box = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshPhongMaterial({ color: 0xff0000 }));
+            box.castShadow = true; group.add(box);
+            const rib1 = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.1, 0.62), new THREE.MeshBasicMaterial({ color: 0x00ff00 })); group.add(rib1);
+            const rib2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.62, 0.62), new THREE.MeshBasicMaterial({ color: 0x00ff00 })); group.add(rib2);
+            const x = (Math.random() - 0.5) * 60; const z = (Math.random() - 0.5) * 60;
+            group.position.set(x, 0.5, z);
+            scene.add(group);
+            presents.push(group);
+        }
+
+        function deliverPresent(trigger) {
+            if (inventory <= 0) {
+                showInteractionMsg("Você precisa pegar presentes antes!", 1500); 
+                return;
+            }
+            if (trigger.userData.hasGift) { showInteractionMsg("Esta casa já tem presente!", 1000); return; }
+            trigger.userData.hasGift = true;
+            inventory--; deliveredCount++;
+            document.getElementById('inventory').innerText = inventory;
+            document.getElementById('delivered').innerText = deliveredCount;
+            const box = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshPhongMaterial({ color: 0xff0000 }));
+            const worldPos = new THREE.Vector3();
+            trigger.getWorldPosition(worldPos);
+            box.position.copy(worldPos); box.position.x += (Math.random()-0.5); box.position.y = 0.5;
+            scene.add(box);
+            deliveredGiftsObjects.push(box);
+            if (trigger.userData.linkedKid) trigger.userData.linkedKid.userData.isHappy = true;
+            
+            showInteractionMsg("Parabéns, mais uma criança feliz! 🎄", 4000);
+            
+            if (deliveredCount >= totalDeliveriesNeeded) triggerVictory();
+        }
+
+        function updateSmoke(dt) {
+            // Fumaça das Casas
+            fireplaces.forEach(fp => {
+                if (fp.userData.hasGift && fp.userData.linkedEmitter) {
+                    if (Math.random() > 0.8) {
+                        const worldPos = new THREE.Vector3();
+                        fp.userData.linkedEmitter.getWorldPosition(worldPos);
+                        createSmokeParticle(worldPos);
+                    }
+                }
+            });
+
+            // Fumaça do Trem
+            if (trainEmitter) {
+                if (Math.random() > 0.7) {
+                    const worldPos = new THREE.Vector3();
+                    trainEmitter.getWorldPosition(worldPos);
+                    createSmokeParticle(worldPos, 0xaaaaaa); 
+                }
+            }
+
+            for (let i = smokeParticles.length - 1; i >= 0; i--) {
+                const p = smokeParticles[i];
+                p.userData.life -= dt;
+                p.position.addScaledVector(p.userData.vel, dt);
+                p.scale.multiplyScalar(1.01); 
+                p.material.opacity = p.userData.life / 2.0;
+                if (p.userData.life <= 0) { scene.remove(p); smokeParticles.splice(i, 1); }
+            }
+        }
+
+        function createSmokeParticle(pos, colorHex = 0xcccccc) {
+            const p = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3, 0.3, 0.3), 
+                new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.6 })
+            );
+            p.position.copy(pos);
+            p.position.x += (Math.random()-0.5)*0.5;
+            p.userData = { life: 2.0, vel: new THREE.Vector3((Math.random()-0.5)*1, 2 + Math.random(), (Math.random()-0.5)*1) };
+            scene.add(p);
+            smokeParticles.push(p);
+        }
+
+        function updateChildren(dt) {
+            kids.forEach(kid => {
+                if (kid.userData.isHappy) {
+                    kid.position.y = kid.userData.baseY + Math.abs(Math.sin(clock.elapsedTime * 10)) * 0.5;
+                    kid.userData.armL.rotation.z = Math.PI - 0.5 + Math.sin(clock.elapsedTime * 20) * 0.2;
+                    kid.userData.armR.rotation.z = -Math.PI + 0.5 - Math.sin(clock.elapsedTime * 20) * 0.2;
+                }
+            });
+        }
+
+        // --- PET ---
+        function spawnPet() {
+            if (petActive) return;
+            const group = new THREE.Group();
+            const geometry = new THREE.IcosahedronGeometry(0.8, 0); 
+            const material = new THREE.MeshPhongMaterial({ color: 0xff0000, shininess: 80 });
+            const body = new THREE.Mesh(geometry, material); body.castShadow = true; group.add(body);
+            const eyeGeo = new THREE.SphereGeometry(0.2, 8, 8); const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.3, 0.3, 0.6); const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.3, 0.3, 0.6);
+            const pupilGeo = new THREE.SphereGeometry(0.08, 8, 8); const pupilMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const pupL = new THREE.Mesh(pupilGeo, pupilMat); pupL.position.z = 0.18; eyeL.add(pupL); const pupR = new THREE.Mesh(pupilGeo, pupilMat); pupR.position.z = 0.18; eyeR.add(pupR);
+            group.add(eyeL); group.add(eyeR);
+            group.position.set(2, 0.5, 2); scene.add(group); pet = group; petActive = true;
+        }
+
+        function updatePet(dt) {
+            if (!petActive || !pet || !character) return;
+            const targetPos = currentVehicle ? currentVehicle.position : character.position;
+            pet.lookAt(targetPos.x, pet.position.y, targetPos.z);
+            const dist = pet.position.distanceTo(targetPos);
+            const stopDist = currentVehicle ? 6.0 : 2.0;
+            if (dist > stopDist) {
+                const dir = new THREE.Vector3().subVectors(targetPos, pet.position).normalize();
+                pet.position.addScaledVector(dir, petSpeed * dt);
+            }
+            pet.position.y = 1 + Math.sin(clock.elapsedTime * 5) * 0.2; 
+        }
+
+        // --- GAME LOGIC ---
+
+        function checkGameInteractions() {
+            if (isVictory) return;
+            
+            // IF A TEMPORARY MESSAGE IS SHOWING, DO NOT INTERFERE
+            if (messageTimer !== null) return; 
+
+            const msgEl = document.getElementById('interaction-msg');
+            msgEl.style.display = 'none';
+
+            // Veículos
+            if (character) {
+                if (!currentVehicle) {
+                    let nearCar = car && character.position.distanceTo(car.position) < 4;
+                    let nearTrain = train && character.position.distanceTo(train.position) < 5;
+                    
+                    if (nearCar || nearTrain) {
+                        msgEl.style.display = 'block';
+                        msgEl.innerText = "F - Dirigir";
+                    }
+                }
+            }
+
+            // Entrega Automática e Aviso
+            if (!currentVehicle && character) {
+                for(let fp of fireplaces) {
+                    const fpPos = new THREE.Vector3();
+                    fp.getWorldPosition(fpPos);
+                    if (character.position.distanceTo(fpPos) < 2.0) { 
+                         if (!fp.userData.hasGift) {
+                            deliverPresent(fp);
+                         }
+                    }
+                }
+            }
+        }
+
+        function onKeyDown(event) {
+            switch(event.code) {
+                case 'KeyW': keys.w = true; break;
+                case 'KeyS': keys.s = true; break;
+                case 'KeyA': keys.a = true; break;
+                case 'KeyD': keys.d = true; break;
+                case 'ShiftLeft': keys.shift = true; break;
+                case 'Space': 
+                     if (!currentVehicle && !isJumping && character && character.position.y <= groundOffset + 0.1) {
+                        velocityY = jumpForce;
+                        isJumping = true;
+                    }
+                    break;
+                case 'KeyF': toggleVehicle(); break;
+                case 'KeyE': 
+                    if (!currentVehicle) {
+                         triggerAttack();
+                    }
+                    break;
+            }
+        }
+
+        function onMouseDown(event) {
+            if (event.target.id === 'restart-btn') return;
+            if (document.pointerLockElement === document.body && event.button === 0) {
+                if (!currentVehicle) triggerAttack();
+            } else if (!isVictory) {
+                document.body.requestPointerLock();
+            }
+        }
+
+        function showInteractionMsg(text, duration) {
+            const el = document.getElementById('interaction-msg');
+            el.innerText = text;
+            el.style.display = 'block';
+            
+            if (messageTimer) clearTimeout(messageTimer);
+            
+            messageTimer = setTimeout(() => {
+                el.style.display = 'none';
+                messageTimer = null;
+            }, duration);
+        }
+
+        function toggleVehicle() {
+            if (!character) return;
+            
+            if (currentVehicle) {
+                // Sair
+                character.visible = true;
+                const offset = new THREE.Vector3(-2, groundOffset, 0).applyAxisAngle(new THREE.Vector3(0,1,0), currentVehicle.rotation.y);
+                character.position.copy(currentVehicle.position).add(offset);
+                character.position.y = groundOffset;
+                currentVehicle = null;
+                vehicleSpeed = 0;
+                cameraDistance = 8;
+            } else {
+                // Entrar
+                if (car && character.position.distanceTo(car.position) < 4) {
+                    currentVehicle = car;
+                } else if (train && character.position.distanceTo(train.position) < 5) {
+                    currentVehicle = train;
+                }
+
+                if (currentVehicle) {
+                    character.visible = false;
+                    character.position.copy(currentVehicle.position);
+                    cameraDistance = 12;
+                }
+            }
+        }
+
+        function checkCollisions() {
+            if (!character || isVictory) return;
+            const playerBox = new THREE.Box3().setFromObject(currentVehicle ? currentVehicle : character);
+            if (!currentVehicle) playerBox.expandByScalar(-0.2);
+
+            for (let i = presents.length - 1; i >= 0; i--) {
+                const p = presents[i];
+                const pBox = new THREE.Box3().setFromObject(p);
+                if (playerBox.intersectsBox(pBox)) {
+                    scene.remove(p);
+                    presents.splice(i, 1);
+                    inventory++;
+                    document.getElementById('inventory').innerText = inventory;
+                    spawnPresent();
+                }
+                p.rotation.y += 0.02;
+            }
+        }
+
+        function loadCharacter() {
+            const loader = new GLTFLoader();
+            loader.load(MODEL_URL, (gltf) => {
+                character = gltf.scene;
+                character.traverse(c => { if(c.isMesh) { c.castShadow=true; }});
+                character.scale.set(0.025, 0.025, 0.025);
+                
+                character.position.set(0,0,0);
+                character.updateMatrixWorld(true);
+                const box = new THREE.Box3().setFromObject(character);
+                groundOffset = -box.min.y;
+                character.position.y = groundOffset;
+                
+                scene.add(character);
+                
+                mixer = new THREE.AnimationMixer(character);
+                const anims = gltf.animations;
+                if(anims.length > 0) {
+                    let idle = anims.find(a=>a.name.toLowerCase().includes('idle')) || anims[0];
+                    let walk = anims.find(a=>a.name.toLowerCase().includes('walk')) || anims[1] || anims[0];
+                    let run = anims.find(a=>a.name.toLowerCase().includes('run')) || anims[2] || anims[0];
+                    let victory = anims.length > 4 ? anims[4] : (anims.find(a=>a.name.toLowerCase().includes('victory')) || anims[0]);
+                    let attack = anims.length > 3 ? anims[3] : anims[0];
+
+                    actions['Idle'] = mixer.clipAction(idle);
+                    actions['Walk'] = mixer.clipAction(walk);
+                    actions['Run'] = mixer.clipAction(run);
+                    actions['Attack'] = mixer.clipAction(attack);
+                    actions['Victory'] = mixer.clipAction(victory); 
+
+                    mixer.addEventListener('finished', (e) => {
+                        if (isAttacking && e.action === actions['Attack']) {
+                            isAttacking = false;
+                            const isMoving = keys.w || keys.s || keys.a || keys.d;
+                            let nextAnim = 'Idle';
+                            if (isMoving) nextAnim = 'Walk'; 
+                            
+                            const nextAction = actions[nextAnim];
+                            if(nextAction) {
+                                nextAction.reset().play();
+                                actions['Attack'].crossFadeTo(nextAction, 0.2, true);
+                                activeAction = nextAction;
+                            }
+                        }
+                    });
+
+                    activeAction = actions['Idle'];
+                    activeAction.play();
+                }
+                document.getElementById('loading-screen').style.display='none';
+            });
+        }
+
+        function checkWallCollision(position) {
+            const charBox = new THREE.Box3().setFromCenterAndSize(
+                new THREE.Vector3(position.x, 1, position.z), 
+                new THREE.Vector3(0.5, 2, 0.5)
+            );
+            for (let wallBox of wallColliders) {
+                if (charBox.intersectsBox(wallBox)) return true;
+            }
+            return false;
+        }
+
+        function triggerAttack() {
+            if (isVictory || isAttacking || currentVehicle || !actions['Attack']) return;
+            isAttacking = true;
+            const action = actions['Attack'];
+            action.reset();
+            action.setLoop(THREE.LoopOnce);
+            action.clampWhenFinished = true;
+            if (activeAction) activeAction.fadeOut(0.1);
+            action.fadeIn(0.1);
+            action.play();
+            activeAction = action;
+        }
+
+        function triggerVictory() {
+            if (isVictory) return;
+            isVictory = true;
+            document.getElementById('victory-container').style.display = 'flex'; 
+            setTimeout(() => { document.getElementById('victory-container').classList.add('show'); }, 10);
+            document.exitPointerLock();
+
+            if (actions['Victory']) {
+                const winAnim = actions['Victory'];
+                winAnim.reset();
+                winAnim.setLoop(THREE.LoopRepeat);
+                if (activeAction) activeAction.fadeOut(0.5);
+                winAnim.fadeIn(0.5);
+                winAnim.play();
+                activeAction = winAnim;
+            }
+        }
+
+        function updateCharacter(dt) {
+            if (!character || currentVehicle) return;
+            
+            if (isVictory) {
+                 if (character.position.y > groundOffset) {
+                    velocityY += gravity * dt;
+                    character.position.y += velocityY * dt;
+                    if (character.position.y <= groundOffset) character.position.y = groundOffset;
+                 }
+                 return;
+            }
+
+            velocityY += gravity * dt;
+            character.position.y += velocityY * dt;
+            
+            if (character.position.y <= groundOffset) {
+                character.position.y = groundOffset;
+                velocityY = 0;
+                isJumping = false;
+            }
+
+            if (isAttacking) return; 
+
+            const isMoving = keys.w || keys.s || keys.a || keys.d;
+            
+            if (mixer) {
+                if (isMoving) {
+                    const targetAnim = 'Walk';
+                    
+                    if (activeAction !== actions[targetAnim]) {
+                        if(activeAction && typeof activeAction.fadeOut === 'function') activeAction.fadeOut(0.2);
+                        activeAction = actions[targetAnim];
+                        if(activeAction) activeAction.reset().fadeIn(0.2).play();
+                    }
+                    if (activeAction) {
+                        activeAction.timeScale = keys.shift ? 1.5 : 1.0; 
+                    }
+                } else {
+                    if (activeAction !== actions['Idle']) {
+                        if(activeAction && typeof activeAction.fadeOut === 'function') activeAction.fadeOut(0.2);
+                        activeAction = actions['Idle'];
+                        if(activeAction) activeAction.reset().fadeIn(0.2).play();
+                    }
+                }
+            }
+
+            if (isMoving) {
+                const speed = keys.shift ? runSpeed : walkSpeed; 
+                const camDirX = Math.sin(cameraRotationX);
+                const camDirZ = Math.cos(cameraRotationX);
+                const fwd = new THREE.Vector3(-camDirX, 0, -camDirZ);
+                const right = new THREE.Vector3(camDirZ, 0, -camDirX);
+                
+                const move = new THREE.Vector3();
+                if (keys.w) move.add(fwd);
+                if (keys.s) move.sub(fwd);
+                if (keys.d) move.add(right);
+                if (keys.a) move.sub(right);
+
+                if (move.lengthSq() > 0) {
+                    move.normalize();
+                    const nextPos = character.position.clone().addScaledVector(move, speed * dt);
+                    
+                    if (!checkWallCollision(nextPos)) {
+                        character.position.copy(nextPos);
+                    } else {
+                        const moveX = new THREE.Vector3(move.x, 0, 0);
+                        if (moveX.lengthSq() > 0.01) { 
+                            const nextPosX = character.position.clone().addScaledVector(moveX.normalize(), speed * dt * Math.abs(move.x));
+                            if (!checkWallCollision(nextPosX)) character.position.x = nextPosX.x;
+                        }
+                        const moveZ = new THREE.Vector3(0, 0, move.z);
+                        if (moveZ.lengthSq() > 0.01) {
+                            const nextPosZ = character.position.clone().addScaledVector(moveZ.normalize(), speed * dt * Math.abs(move.z));
+                            if (!checkWallCollision(nextPosZ)) character.position.z = nextPosZ.z;
+                        }
+                    }
+                    
+                    const targetRot = Math.atan2(move.x, move.z);
+                    let rotDiff = targetRot - character.rotation.y;
+                    while (rotDiff > Math.PI) rotDiff -= Math.PI*2;
+                    while (rotDiff < -Math.PI) rotDiff += Math.PI*2;
+                    character.rotation.y += rotDiff * (rotationSpeed * dt);
+                }
+            }
+        }
+
+        function updateVehicle(dt) {
+            if (!currentVehicle) return;
+
+            const oldPos = currentVehicle.position.clone();
+            const oldRot = currentVehicle.rotation.y;
+
+            const maxSpeed = (currentVehicle === train) ? trainMaxSpeed : carMaxSpeed;
+            const friction = (currentVehicle === train) ? 5 : vehicleFriction;
+
+            if (keys.w) vehicleSpeed += vehicleAccel * dt;
+            else if (keys.s) vehicleSpeed -= vehicleAccel * dt;
+            else {
+                if (vehicleSpeed > 0) vehicleSpeed = Math.max(0, vehicleSpeed - friction*dt);
+                if (vehicleSpeed < 0) vehicleSpeed = Math.min(0, vehicleSpeed + friction*dt);
+            }
+            vehicleSpeed = Math.max(-maxSpeed/2, Math.min(maxSpeed, vehicleSpeed));
+
+            if (Math.abs(vehicleSpeed) > 0.1) {
+                const dir = vehicleSpeed > 0 ? 1 : -1;
+                const turnSpeed = (currentVehicle === train) ? 1.0 : 2.0; 
+                if (keys.a) currentVehicle.rotation.y += turnSpeed * dt * dir;
+                if (keys.d) currentVehicle.rotation.y -= turnSpeed * dt * dir;
+            }
+
+            const fwd = new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0), currentVehicle.rotation.y);
+            currentVehicle.position.addScaledVector(fwd, vehicleSpeed * dt);
+            
+            currentVehicle.updateMatrixWorld();
+            const carBox = new THREE.Box3().setFromObject(currentVehicle);
+            carBox.expandByScalar(-0.5); 
+
+            let collision = false;
+            for(let obs of obstacles) {
+                if (carBox.intersectsBox(obs)) {
+                    collision = true;
+                    break;
+                }
+            }
+
+            if (collision) {
+                currentVehicle.position.copy(oldPos);
+                currentVehicle.rotation.y = oldRot;
+                vehicleSpeed = 0;
+            }
+
+            character.position.copy(currentVehicle.position);
+        }
+
+        function updateCamera() {
+            if (!character) return;
+            let target = character.position.clone();
+            
+            if (currentVehicle) {
+                target.y += 2.0;
+                const dist = (currentVehicle === train) ? -15 : -12;
+                const offset = new THREE.Vector3(0, 6, dist).applyAxisAngle(new THREE.Vector3(0,1,0), currentVehicle.rotation.y);
+                camera.position.lerp(currentVehicle.position.clone().add(offset), 0.1);
+                camera.lookAt(currentVehicle.position.clone().add(new THREE.Vector3(0,1,0)));
+            } else {
+                target.y += 1.0;
+                const offX = cameraDistance * Math.sin(cameraRotationX) * Math.cos(cameraRotationY);
+                const offZ = cameraDistance * Math.cos(cameraRotationX) * Math.cos(cameraRotationY);
+                const offY = cameraDistance * Math.sin(cameraRotationY);
+                camera.position.lerp(new THREE.Vector3(target.x + offX, target.y + offY, target.z + offZ), 0.2);
+                camera.lookAt(target);
+            }
+        }
+
+        function onKeyUp(e) {
+            if(e.code==='KeyW') keys.w=false;
+            if(e.code==='KeyS') keys.s=false;
+            if(e.code==='KeyA') keys.a=false;
+            if(e.code==='KeyD') keys.d=false;
+            if(e.code.includes('Shift')) keys.shift=false;
+        }
+
+        function onClick(e) { if(e.target.id!=='restart-btn') document.body.requestPointerLock(); }
+        function onMouseMove(e) {
+            if ((document.pointerLockElement === document.body && !currentVehicle) || isVictory) {
+                cameraRotationX -= e.movementX * 0.002;
+                cameraRotationY -= e.movementY * 0.002;
+                cameraRotationY = Math.max(0.1, Math.min(Math.PI/2 - 0.1, cameraRotationY));
+            }
+        }
+        function onMouseWheel(e) { cameraDistance = Math.max(2, Math.min(25, cameraDistance + e.deltaY*0.01)); }
+        function onPointerLockChange() {
+            document.getElementById('click-to-start').style.display = document.pointerLockElement ? 'none' : 'block';
+        }
+        function onWindowResize() {
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function restartGame(e) {
+            if(e) e.stopPropagation();
+            
+            isVictory = false;
+            const victContainer = document.getElementById('victory-container');
+            victContainer.classList.remove('show'); 
+            setTimeout(() => { victContainer.style.display = 'none'; }, 1000);
+            
+            inventory = 0;
+            deliveredCount = 0;
+            document.getElementById('inventory').innerText = 0;
+            document.getElementById('delivered').innerText = 0;
+            
+            deliveredGiftsObjects.forEach(obj => scene.remove(obj));
+            deliveredGiftsObjects = [];
+
+            fireplaces.forEach(fp => {
+                fp.userData.hasGift = false;
+                if(fp.userData.linkedKid) {
+                    fp.userData.linkedKid.userData.isHappy = false;
+                    fp.userData.linkedKid.userData.armL.rotation.z = 0;
+                    fp.userData.linkedKid.userData.armR.rotation.z = 0;
+                    fp.userData.linkedKid.position.y = fp.userData.linkedKid.userData.baseY;
+                }
+            });
+
+            presents.forEach(p => scene.remove(p));
+            presents = [];
+            for(let i=0; i<15; i++) spawnPresent(); 
+            
+            if (currentVehicle) toggleVehicle(); 
+            
+            character.position.set(0, groundOffset, 0);
+            character.rotation.set(0,0,0);
+            
+            if (car) {
+                car.position.set(8, 0, 8);
+                car.rotation.set(0, -Math.PI/4, 0);
+            }
+            if (train) {
+                train.position.set(-8, 0, -8);
+                train.rotation.set(0, Math.PI/4, 0);
+            }
+
+            if (activeAction !== actions['Idle']) {
+                if(activeAction) activeAction.fadeOut(0.2);
+                activeAction = actions['Idle'];
+                activeAction.reset().play();
+            }
+
+            document.body.requestPointerLock();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+            if (mixer) mixer.update(dt);
+            updateCharacter(dt);
+            updateVehicle(dt);
+            updatePet(dt);
+            updateChildren(dt); 
+            updateSmoke(dt);
+            checkCollisions();
+            checkGameInteractions();
+            updateCamera();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
